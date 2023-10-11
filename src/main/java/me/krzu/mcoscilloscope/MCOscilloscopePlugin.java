@@ -67,7 +67,7 @@ public class MCOscilloscopePlugin extends JavaPlugin {
                   new Transformation(
                     new Vector3f(),
                     new AxisAngle4f(),
-                    new Vector3f(4, 2, 2),
+                    new Vector3f(1, 0.5f, 2),
                     new AxisAngle4f()
                   )
                 );

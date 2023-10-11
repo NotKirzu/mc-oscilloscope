@@ -4,9 +4,9 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.annotation.Nullable;
 import javax.sound.sampled.LineUnavailableException;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -24,145 +24,118 @@ import be.tarsos.dsp.io.jvm.AudioDispatcherFactory;
 import be.tarsos.dsp.io.jvm.AudioPlayer;
 
 public class MCOscilloscope implements OscilloscopeEventHandler {
-  private final MCOscilloscopePlugin plugin;
+    private final MCOscilloscopePlugin plugin;
 
-  private AudioDispatcher dispatcher;
+    private final Set<BlockDisplay> blocks1 = new HashSet<>();
+    private final Set<BlockDisplay> blocks2 = new HashSet<>();
 
-  private Set<BlockDisplay> blocks1;
-  private Set<BlockDisplay> blocks2;
-  
-  public MCOscilloscope(MCOscilloscopePlugin plugin) {
-    this.plugin = plugin;
-  }
+    private AudioDispatcher dispatcher;
+    private World world;
+    private Location loc;
 
-  @Override
-  public void handleEvent(float[] buffer, AudioEvent event) {
-    byte[] bytes = event.getByteBuffer();
-    float step = 20_480 / bytes.length;
+    public MCOscilloscope(MCOscilloscopePlugin plugin) {
+        this.plugin = plugin;
+    }
 
-    this.plugin.newChain()
-      .sync(() -> {
-          World world = Bukkit.getWorld("world");
+    @Override
+    public void handleEvent(float[] buffer, AudioEvent event) {
+        byte[] bytes = event.getByteBuffer();
+        float step = (float) 20_460 / bytes.length;
 
-          if (blocks1 == null || blocks1.isEmpty()) {
-            if (blocks1 == null) {
-              blocks1 = new HashSet<>();
-            }
+        this.plugin.newChain()
+                .sync(() -> {
+                    this.handleDisplay(blocks1, bytes, step, 6);
+                    this.handleDisplay(blocks2, bytes, step, 2);
+                })
+                .execute();
+    }
 
+    private void handleDisplay(Set<BlockDisplay> blocks, byte[] bytes, float step, int yOffset) {
+        if (blocks.isEmpty()) {
             for (int i = 1; i < bytes.length; i += 2) {
-              float percent = bytes[i] / 128.0f;
-              float x = (float) (i * step) / (20_480 / 150);
-              float y = (float) 10.0f + ((percent * 60) / 2);
+                float percent = bytes[i] / 128.0f;
+                float x = (i * step) / ((float) 20_460 / 200);
+                float y = 30.0f + ((percent * 100) / yOffset);
 
-              
-              BlockDisplay bd = world.spawn(
-                new Location(world, x, y, 0), BlockDisplay.class, block -> {
-                  block.setBlock(Material.ORANGE_CONCRETE.createBlockData());
-                  block.setViewRange(60.0f);
-                  block.setTransformation(
-                    new Transformation(
-                      new Vector3f(),
-                      new AxisAngle4f(),
-                      new Vector3f(1, 1, 5),
-                      new AxisAngle4f()
-                    )
-                  );
-                });
-              
-              blocks1.add(bd);
+                BlockDisplay bd = this.world.spawn(
+                        this.loc.clone().add(x, y, 0), BlockDisplay.class, block -> {
+                            block.setBlock((yOffset == 2 ? Material.BLACK_CONCRETE : Material.LIME_CONCRETE).createBlockData());
+                            block.setViewRange(100.0f);
+                            block.setTransformation(
+                                    new Transformation(
+                                            new Vector3f(),
+                                            new AxisAngle4f(),
+                                            new Vector3f(2, 0.5f, 10),
+                                            new AxisAngle4f()
+                                    )
+                            );
+                        });
+
+                blocks.add(bd);
             }
-          } else {
+        } else {
             int i = 1;
-            for (BlockDisplay block : blocks1) {
-              float percent = bytes[i] / 128.0f;
-              float x = (float) (i * step) / (20_480 / 150);
-              float y = (float) 10.0f + ((percent * 60) / 2);
-      
-              block.teleport(new Location(world, x, y, 0));
-              i += 2;
+            for (BlockDisplay block : blocks) {
+                float percent = bytes[i] / 128.0f;
+                float x = (i * step) / ((float) 20_460 / 200);
+                float y = 30.0f + ((percent * 100) / yOffset);
+
+                block.teleport(this.loc.clone().add(x, y, 0));
+                i += 2;
             }
-          }
-
-          if (blocks2 == null || blocks1.isEmpty()) {
-            if (blocks2 == null) {
-              blocks2 = new HashSet<>();
-            }
-
-            for (int i = 1; i < bytes.length; i += 2) {
-              float percent = bytes[i] / 128.0f;
-              float x = (float) (i * step) / (20_480 / 150);
-              float y = (float) 10.0f + ((percent * 60) / 4);
-
-              BlockDisplay bd = world.spawn(
-                new Location(world, x, y, 0), BlockDisplay.class, block -> {
-                  block.setBlock(Material.CYAN_CONCRETE.createBlockData());
-                  block.setViewRange(60.0f);
-                  block.setTransformation(
-                    new Transformation(
-                      new Vector3f(),
-                      new AxisAngle4f(),
-                      new Vector3f(1, 1, 5),
-                      new AxisAngle4f()
-                    )
-                  );
-                });
-              
-              blocks2.add(bd);
-            }
-          } else {
-            int i = 1;
-            for (BlockDisplay block : blocks2) {
-              float percent = bytes[i] / 128.0f;
-              float x = (float) (i * step) / (20_480 / 150);
-              float y = (float) 10.0f + ((percent * 60) / 4);
-      
-              block.teleport(new Location(world, x, y, 0));
-              i += 2;
-            }
-          }
-        }).execute();
-  }
-
-  public void start(Player player) {
-    player.sendMessage("Starting oscilloscope...");
-
-    this.plugin.newChain()
-        .async(() -> {
-          player.sendMessage("Oscilloscope started!");
-          File audio = new File(this.plugin.getDataFolder(), "audio.mp3");
-          dispatcher = AudioDispatcherFactory.fromPipe(audio.getAbsolutePath(), 44100, 1024, 0);
-          dispatcher.addAudioProcessor(new Oscilloscope(this));
-          try {
-            dispatcher.addAudioProcessor(new AudioPlayer(dispatcher.getFormat()));
-          } catch (LineUnavailableException e) {
-            e.printStackTrace();
-          }
-          dispatcher.run();
-        })
-        .execute();
-  }
-
-  public void stop(Player player) {
-    player.sendMessage("Oscilloscope stopped!");
-
-    if (blocks1 != null) {
-      for (BlockDisplay block : blocks1) {
-        block.remove();
-      }
-      blocks1.clear();
-      blocks1 = null;
+        }
     }
 
-    if (blocks2 != null) {
-      for (BlockDisplay block : blocks2) {
-        block.remove();
-      }
-      blocks2.clear();
-      blocks2 = null;
+    public void start(Player player) {
+        player.sendMessage("Starting oscilloscope...");
+
+        Location loc = player.getLocation();
+        this.loc = loc;
+        this.world = loc.getWorld();
+
+        this.plugin.newChain()
+                .async(() -> {
+                    player.sendMessage("Oscilloscope started!");
+                    File audio = new File(this.plugin.getDataFolder(), "audio.mp3");
+                    dispatcher = AudioDispatcherFactory.fromPipe(audio.getAbsolutePath(), 44100, 1024, 0);
+                    dispatcher.addAudioProcessor(new Oscilloscope(this));
+                    try {
+                        dispatcher.addAudioProcessor(new AudioPlayer(dispatcher.getFormat()));
+                    } catch (LineUnavailableException e) {
+                        e.printStackTrace();
+                    }
+                    dispatcher.run();
+                    this.stop(null);
+                    player.sendMessage("Oscilloscope ended!");
+                })
+                .execute();
     }
 
-    if (dispatcher != null) {
-      dispatcher.stop();
+    public void stop(@Nullable Player player) {
+        if (player != null) {
+            player.sendMessage("Oscilloscope stopped!");
+        }
+
+        this.plugin.newChain()
+                .sync(() -> {
+                    if (!blocks1.isEmpty()) {
+                        for (BlockDisplay block : blocks1) {
+                            block.remove();
+                        }
+                        blocks1.clear();
+                    }
+
+                    if (!blocks2.isEmpty()) {
+                        for (BlockDisplay block : blocks2) {
+                            block.remove();
+                        }
+                        blocks2.clear();
+                    }
+                })
+                .execute();
+
+        if (dispatcher != null) {
+            dispatcher.stop();
+        }
     }
-  }
 }

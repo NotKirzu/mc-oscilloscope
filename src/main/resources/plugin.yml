@@ -1,0 +1,8 @@
+name: ${project.name}
+version: ${project.version}
+main: me.krzu.mcoscilloscope.MCOscilloscopePlugin
+author: kirzxh
+api-version: 1.20
+commands:
+  mco:
+    description: "sexo"

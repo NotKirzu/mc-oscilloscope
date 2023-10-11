@@ -10,6 +10,8 @@ import javax.sound.sampled.LineUnavailableException;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Transformation;
@@ -28,10 +30,12 @@ public class MCOscilloscope implements OscilloscopeEventHandler {
 
     private final Set<BlockDisplay> blocks1 = new HashSet<>();
     private final Set<BlockDisplay> blocks2 = new HashSet<>();
-
     private AudioDispatcher dispatcher;
     private World world;
     private Location loc;
+
+    private BlockData block1;
+    private BlockData block2;
 
     public MCOscilloscope(MCOscilloscopePlugin plugin) {
         this.plugin = plugin;
@@ -59,7 +63,7 @@ public class MCOscilloscope implements OscilloscopeEventHandler {
 
                 BlockDisplay bd = this.world.spawn(
                         this.loc.clone().add(x, y, 0), BlockDisplay.class, block -> {
-                            block.setBlock((yOffset == 2 ? Material.BLACK_CONCRETE : Material.LIME_CONCRETE).createBlockData());
+                            block.setBlock(yOffset == 2 ? this.block1 : this.block2);
                             block.setViewRange(100.0f);
                             block.setTransformation(
                                     new Transformation(
@@ -89,14 +93,17 @@ public class MCOscilloscope implements OscilloscopeEventHandler {
     public void start(Player player) {
         player.sendMessage("Starting oscilloscope...");
 
+        FileConfiguration config = this.plugin.getConfig();
         Location loc = player.getLocation();
         this.loc = loc;
         this.world = loc.getWorld();
+        this.block1 = Material.valueOf(config.getString("blocks.1", "BLACK_CONCRETE")).createBlockData();
+        this.block2 = Material.valueOf(config.getString("blocks.2", "LIME_CONCRETE")).createBlockData();
 
         this.plugin.newChain()
                 .async(() -> {
                     player.sendMessage("Oscilloscope started!");
-                    File audio = new File(this.plugin.getDataFolder(), "audio.mp3");
+                    File audio = new File(this.plugin.getDataFolder(), config.getString("audio-file", "audio.mp3"));
                     dispatcher = AudioDispatcherFactory.fromPipe(audio.getAbsolutePath(), 44100, 1024, 0);
                     dispatcher.addAudioProcessor(new Oscilloscope(this));
                     try {

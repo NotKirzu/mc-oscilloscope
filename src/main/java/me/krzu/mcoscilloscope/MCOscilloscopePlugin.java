@@ -21,7 +21,6 @@ public class MCOscilloscopePlugin extends JavaPlugin {
 
   private TaskChainFactory taskChainFactory;
   private MCOscilloscope mcOscilloscope;
-
   private final Logger LOGGER
       = Logger.getLogger(getName());
 
@@ -30,10 +29,12 @@ public class MCOscilloscopePlugin extends JavaPlugin {
     taskChainFactory = BukkitTaskChainFactory.create(this);
     mcOscilloscope = new MCOscilloscope(this);
     getCommand("mco").setExecutor(this);
+
+    getConfig().options().copyDefaults(true);
+    saveDefaultConfig();
     
     LOGGER.info("Plugin enabled!");
   }
-
   @Override
   public void onDisable() {
     LOGGER.info("Plugin disabled!");
@@ -59,19 +60,9 @@ public class MCOscilloscopePlugin extends JavaPlugin {
         case "stop":
           mcOscilloscope.stop(player);
           break;
-        case "test":
-          player.getWorld().spawn(
-            player.getLocation(), BlockDisplay.class, block -> {
-                block.setBlock(Material.ORANGE_CONCRETE.createBlockData());
-                block.setTransformation(
-                  new Transformation(
-                    new Vector3f(),
-                    new AxisAngle4f(),
-                    new Vector3f(1, 0.5f, 2),
-                    new AxisAngle4f()
-                  )
-                );
-            });
+        case "reload":
+          mcOscilloscope.stop(player);
+          reloadConfig();
           break;
         default:
           sender.sendMessage("Usage: /mco <start|stop>");

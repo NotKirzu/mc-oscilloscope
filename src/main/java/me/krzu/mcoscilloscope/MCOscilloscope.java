@@ -94,7 +94,7 @@ public class MCOscilloscope implements OscilloscopeEventHandler {
         player.sendMessage("Starting oscilloscope...");
 
         FileConfiguration config = this.plugin.getConfig();
-        Location loc = player.getLocation();
+        Location loc = new Location(player.getWorld(), 185.5, 134.0, -97.5, 165, 15);
         this.loc = loc;
         this.world = loc.getWorld();
         this.block1 = Material.valueOf(config.getString("blocks.1", "BLACK_CONCRETE")).createBlockData();
@@ -109,7 +109,7 @@ public class MCOscilloscope implements OscilloscopeEventHandler {
                     try {
                         dispatcher.addAudioProcessor(new AudioPlayer(dispatcher.getFormat()));
                     } catch (LineUnavailableException e) {
-                        e.printStackTrace();
+                        System.out.println(e.getMessage());
                     }
                     dispatcher.run();
                     this.stop(null);
